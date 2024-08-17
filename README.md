@@ -17,6 +17,6 @@ if (selectedQs.some(wildcard => wildcard === "$__all")) {
       target.qmetric = processQueue;
       target.queue = target.metric.replace('root', target.qmetric);
       return getYarnAppIdData(target);
-    }));
-  });
+    }));
+  });
 }
