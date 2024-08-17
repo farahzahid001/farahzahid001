@@ -1,7 +1,7 @@
 Datasource
 https://github.com/grafana/grafana/issues/89516
 
-if (selectedQs.some(wildcard => wildcard === "$__all")) {
+'if (selectedQs.some(wildcard => wildcard === "$__all")) {
   var allQueue = allQueues[0].options.filter(q => q.text !== "All").map(queue => queue.value);
   allQueue.forEach(processQueue => {
     metricsPromises.push(options.targets.map(target => {
@@ -20,3 +20,4 @@ if (selectedQs.some(wildcard => wildcard === "$__all")) {
     }));
   });
 }
+'
