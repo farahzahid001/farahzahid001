@@ -1,23 +1,26 @@
 Datasource
 https://github.com/grafana/grafana/issues/89516
 
-'if (selectedQs.some(wildcard => wildcard === "$__all")) {
-  var allQueue = allQueues[0].options.filter(q => q.text !== "All").map(queue => queue.value);
-  allQueue.forEach(processQueue => {
+```
+if (getTemplateSrv().getVariables()[1] && getTemplateSrv().getVariables()[1].name === "hosts") {
+  let splitHosts = [];
+  let allHosts;
+  if (getTemplateSrv().getVariableWithName('hosts').current.text === "All") {
+    allHosts = getTemplateSrv().getVariableWithName('hosts').options
+      .filter(hostName => hostName.text !== "All")
+      .map(hostVal => hostVal.value);
+  }
+  else {
+    allHosts = getTemplateSrv().getVariableWithName('hosts').current.text.split(' + ');
+  }
+  while (allHosts.length > 0) {
+    splitHosts.push(allHosts.splice(0,50));
+  }
+  splitHosts.forEach(splitHost => {
     metricsPromises.push(options.targets.map(target => {
-      target.qmetric = processQueue;
-      target.queue = target.metric.replace('root', target.qmetric);
-      return getYarnAppIdData(target);
-    }));
-  });
-} else {
-  // All selected queues.
-  selectedQs.forEach(processQueue => {
-    metricsPromises.push(options.targets.map(target => {
-      target.qmetric = processQueue;
-      target.queue = target.metric.replace('root', target.qmetric);
-      return getYarnAppIdData(target);
+      target.templatedHost = splitHost.join(',');
+      return getAllHostData(target);
     }));
   });
 }
-'
+```
