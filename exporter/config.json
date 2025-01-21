@@ -1,0 +1,17 @@
+{
+    "generic": {
+        "agent": "LocalAgent",
+        "env": "DEV",
+        "running_interval": 10
+    },
+    "services": {
+        "PING_GOOGLE": {
+            "command": ["ping", "-c", "4", "google.com"],
+            "timeout": 10
+        },
+        "SLEEP_TEST": {
+            "command": ["python3", "-c", "import time; import random; time.sleep(random.randint(1, 5))"],
+            "timeout": 10
+        }
+    }
+}
