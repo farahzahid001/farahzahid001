@@ -8,9 +8,12 @@ from datetime import datetime
 import os
 import threading
 from prometheus_client import start_http_server, Gauge
+import socket
 
 # Declare `my_logger` at the global level
 my_logger = None
+# Get the server name
+server_name = socket.gethostname()
 
 # Prometheus metrics
 metric_success_duration_millisec = Gauge('metric_success_duration_millisec', 'Duration of successful tests in milliseconds', ['service'])
@@ -18,14 +21,11 @@ metric_smoketest_exporter_status = Gauge('metric_smoketest_exporter_status', 'St
 metric_service_success = Gauge('metric_smoketest_success', 'Service success status', ['service'])
 metric_service_slowness = Gauge('metric_smoketest_slowness', 'Service slowness status', ['service'])
 metric_service_duration = Gauge('metric_smoketest_duration', 'Service duration in seconds', ['service'])
-metric_service_raw_message = Gauge('metric_smoketest_raw_message', 'Service raw message', ['service'])
 
 raw_metrics = {}  # all stuff for the metrics will be stored here
 running_interval = 180  # interval for running smoketests in seconds
 state = 'successful'  # initial status of all the smoketests.
 lock = threading.Lock()  # Thread safety lock
-
-# config_file_path = r"/app/config.json"
 
 # Creates formatted message about smoketest command failure reason in case of connection failure.
 def create_custom_short_message(service, raw_message):
@@ -43,7 +43,7 @@ def create_custom_short_message(service, raw_message):
 
 def write_log(level, message):
     batchtime = datetime.today().strftime('%Y-%m-%dT%H:%M:%S.%fZ')  # generating batchtime as a string
-    log_message = batchtime + ' ' + level + ' ' + message.strip().replace(";", "\t") 
+    log_message = batchtime + ' ' + level + ' ' + server_name + ' ' + message.strip().replace(";", "\t") 
     if my_logger:
         my_logger.debug(log_message + '\n')
         print(log_message)
@@ -72,7 +72,7 @@ def smoketest(config, service):
         # except subprocess.CalledProcessError as e:
         #     write_log("ERROR", "Cannot run 'kinit' for service: " + service)
         #     return
-
+        write_log('INFO', f'{service} started')
         start_time = round(time.time())
         output = None
         try:
@@ -87,29 +87,24 @@ def smoketest(config, service):
         except subprocess.TimeoutExpired as e:
             result['slowness'] = 1  # Timed out
             result['success'] = 0  # Failure
-            result['raw_message'] = service + " smoketest timed out."
-        except subprocess.CalledProcessError:
+            write_log("Warning", f"{service} smoketest timed out.")
+        except subprocess.CalledProcessError as e:
             result['success'] = 0  # Failure
-            result['raw_message'] = f"Error for service {service}: {e.stderr}"
+            write_log("ERROR", f"{service} {e.stderr}")
          
         end_time = round(time.time())   
         result['duration'] = (end_time - start_time) * 1000
         
         if result['success'] == 1:
-            result['raw_message'] = f"{service} smoketest is successful in {result['duration']} ms."
+            write_log("INFO", f"{service} exited(0)")
             
         with lock:
             raw_metrics[service] = result
-        
-        
             
         metric_service_success.labels(service=service).set(result['success'])
         metric_service_slowness.labels(service=service).set(result['slowness'])
         metric_service_duration.labels(service=service).set(result['duration'])
-        # metric_service_raw_message.labels(service=service).set(result['raw_message'])
         
-        write_log("INFO", result['raw_message'])
-            
         time.sleep(running_interval)
 
 def main():
@@ -156,8 +151,6 @@ def main():
     for service in config['services']:
         with lock:
             raw_metrics[service] = None
-        print('INFO', f'running {service} smoketest')
-        write_log('INFO', f'running {service} smoketest')
         thread = threading.Thread(target=smoketest, args=(config, service))
         thread.daemon = True
         threads.append(thread)
